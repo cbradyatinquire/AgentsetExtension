@@ -55,10 +55,10 @@ to test-primitives
     show (word "symmetric difference (A - B) u (B - A): " symdiff ". Their who-numbers are: " nos)
     
     let gps agentset:groups-of turtles num-each-bin
-    show (word "partition of ALL turtles into groups of size " num-each-bin ": " gps)
+    show (word "separation of ALL turtles into groups of size " num-each-bin ": " gps)
     
-    let parts agentset:partition turtles num-each-bin
-    show (word "partition of ALL turtles into " num-bins " groups: " parts)
+    let parts agentset:make-n-groups turtles num-each-bin
+    show (word "separation of ALL turtles into " num-bins " groups: " parts)
     
   ]
 end
