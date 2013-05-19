@@ -2,7 +2,6 @@ package agentset
 
 
 //import org.nlogo.app.App
-import scala.collection.JavaConverters._
 import org.nlogo.api._
 
 
@@ -20,12 +19,12 @@ class SetOperations extends DefaultClassManager {
    * @param pm The manager to transport the primitives to NetLogo
    */
   override def load( pm: PrimitiveManager )  {
-    pm.addPrimitive("intersection", IntersectReporter)
-    pm.addPrimitive("difference", DifferenceReporter)
-    pm.addPrimitive("union", UnionReporter)
-    pm.addPrimitive("sym-difference", SymDiffReporter)
-    pm.addPrimitive("groups-of", GroupsOfReporter)
-    pm.addPrimitive("partition", PartitionReporter)
+    pm.addPrimitive("intersection", Intersection)
+    pm.addPrimitive("difference", Difference)
+    pm.addPrimitive("union", Union)
+    pm.addPrimitive("sym-difference", SymDifference)
+    pm.addPrimitive("groups-of", GroupsOfSizeN)
+    pm.addPrimitive("make-n-groups", NGroups)
     //pm.addPrimitive("group-by", GroupByReporter )
     //see comments below. threading issues.
   }
@@ -35,17 +34,16 @@ class SetOperations extends DefaultClassManager {
     //}
 
   def buildAgentSetFrom(k: AgentKind, inp: Set[Agent]): org.nlogo.api.AgentSet = {
-    val asb = new org.nlogo.agent.AgentSetBuilder( k, inp.size )
+    val asBuilder = new org.nlogo.agent.AgentSetBuilder( k, inp.size )
     val it = inp.toIterator
     while ( it.hasNext ) {
-      asb.add( it.next().asInstanceOf[org.nlogo.agent.Agent] )
+      asBuilder.add( it.next().asInstanceOf[org.nlogo.agent.Agent] )
     }
-    asb.build()
+    asBuilder.build()
   }
 
 
   def performBinarySetOp( set1: AgentSet, set2: AgentSet, f: (Set[Agent], Set[Agent]) => Set[Agent] ): org.nlogo.api.AgentSet = {
-
     val k1 = set1.kind
     val k2 = set2.kind
 
@@ -53,6 +51,7 @@ class SetOperations extends DefaultClassManager {
       throw new ExtensionException("AgentSets must be of the same kind.\nThe first argument was of kind " + k1.toString + " while the second was of kind " + k2.toString + ".")
     }
     else {
+      import scala.collection.JavaConverters._
       val sa = set1.agents.asScala.toSet
       val sb = set2.agents.asScala.toSet
 
@@ -60,81 +59,68 @@ class SetOperations extends DefaultClassManager {
     }
   }
 
-
-  object IntersectReporter extends DefaultReporter {
+  trait BinarySetReporter extends DefaultReporter {
+    def functionToApply: (Set[Agent], Set[Agent]) => Set[Agent]
     override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.AgentsetType), Syntax.AgentsetType )
-
     override def report(args: Array[Argument], ctxt: Context): AnyRef = {
         val set1 = args(0).getAgentSet
         val set2 = args(1).getAgentSet
-        performBinarySetOp(set1, set2, (x: Set[Agent], y: Set[Agent]) => x intersect y )
+        performBinarySetOp(set1, set2, (x: Set[Agent], y: Set[Agent]) => functionToApply(x, y) )
     }
   }
 
-  object DifferenceReporter extends DefaultReporter {
-      override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.AgentsetType), Syntax.AgentsetType )
-
-      override def report(args: Array[Argument], ctxt: Context): AnyRef = {
-          val set1 = args(0).getAgentSet
-          val set2 = args(1).getAgentSet
-          performBinarySetOp(set1, set2, (x: Set[Agent], y: Set[Agent]) => x diff y )
-      }
+  object Intersection extends BinarySetReporter {
+    override def functionToApply = (x: Set[Agent], y: Set[Agent]) => x intersect y
   }
 
-  object UnionReporter extends DefaultReporter {
-      override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.AgentsetType), Syntax.AgentsetType )
-
-      override def report(args: Array[Argument], ctxt: Context): AnyRef = {
-          val set1 = args(0).getAgentSet
-          val set2 = args(1).getAgentSet
-          performBinarySetOp(set1, set2, (x: Set[Agent], y: Set[Agent]) => x union y )
-      }
+  object Difference extends BinarySetReporter {
+     override def functionToApply = (x: Set[Agent], y: Set[Agent]) => x diff y
   }
 
-  object SymDiffReporter extends DefaultReporter {
-      override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.AgentsetType), Syntax.AgentsetType )
-
-      override def report(args: Array[Argument], ctxt: Context): AnyRef = {
-          val set1 = args(0).getAgentSet
-          val set2 = args(1).getAgentSet
-          performBinarySetOp(set1, set2, (x: Set[Agent], y: Set[Agent]) => (x diff y) union (y diff x) )
-      }
+  object Union extends BinarySetReporter {
+    override def functionToApply = (x: Set[Agent], y: Set[Agent]) => x union y
   }
 
-  object PartitionReporter extends DefaultReporter {
+  object SymDifference extends BinarySetReporter {
+    override def functionToApply = (x: Set[Agent], y: Set[Agent]) => (x diff y) union (y diff x)
+  }
+
+  object NGroups extends DefaultReporter {
       override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.NumberType), Syntax.ListType )
 
       override def report(args: Array[Argument], ctxt: Context): AnyRef = {
         val agset = args(0).getAgentSet
         val k = agset.kind
-        val numbins:Int = args(1).getIntValue
-        if ( numbins < 1) {
+        val numBins = args(1).getIntValue
+        if ( numBins < 1) {
           throw new ExtensionException("Number of bins must be greater than or equal to one.")
         }
 
-        val la = agset.agents.asScala.toList
-        val mla = la.groupBy( x => la.indexOf(x) % numbins )
+        import scala.collection.JavaConverters._
+        val agList = agset.agents.asScala.toList
+        val mapOfAgList = agList.groupBy( x => agList.indexOf(x) % numBins )
 
         val lbuilder = new LogoListBuilder()
-        mla.foreach( x  => lbuilder add buildAgentSetFrom(k, x._2.toSet) )
+        mapOfAgList.foreach( x  => lbuilder add buildAgentSetFrom(k, x._2.toSet) )
 
         lbuilder.toLogoList
       }
   }
 
-  object GroupsOfReporter extends DefaultReporter {
+  object GroupsOfSizeN extends DefaultReporter {
       override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.NumberType), Syntax.ListType )
 
       override def report(args: Array[Argument], ctxt: Context): AnyRef = {
           val agset = args(0).getAgentSet
           val k = agset.kind
-          val groupsize = args(1).getIntValue
-          if ( groupsize < 1) {
+          val groupSize = args(1).getIntValue
+          if ( groupSize < 1) {
             throw new ExtensionException("Size of group must be greater than or equal to one.")
           }
 
+        import scala.collection.JavaConverters._
           val sa = agset.agents.asScala.toSet
-          val bins = sa.grouped(groupsize)
+          val bins = sa.grouped(groupSize)
           val lbuilder = new LogoListBuilder()
 
           bins.foreach( x => lbuilder.add( buildAgentSetFrom(k, x)) )
