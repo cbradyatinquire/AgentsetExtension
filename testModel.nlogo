@@ -57,7 +57,7 @@ to test-primitives
     let gps agentset:groups-of turtles num-each-bin
     show (word "separation of ALL turtles into groups of size " num-each-bin ": " gps)
     
-    let parts agentset:make-n-groups turtles num-each-bin
+    let parts agentset:make-n-groups turtles num-bins
     show (word "separation of ALL turtles into " num-bins " groups: " parts)
     
   ]
@@ -163,7 +163,7 @@ num-bins
 num-bins
 1
 10
-5
+6
 1
 1
 NIL
@@ -184,7 +184,7 @@ TEXTBOX
 380
 196
 398
-For partition prim
+For make-n-groups prim
 11
 0.0
 1
