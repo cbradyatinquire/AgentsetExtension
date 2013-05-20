@@ -1,7 +1,6 @@
-AGENTSET extension for NetLogo 
+=AGENTSET extension for NetLogo=
 Provides set operations for agentsets in NetLogo.
 
-TODO:
-testing and error catching
-group-by primitive 
-
+==TODO:==
+group-by primitive<br> 
+testing...
