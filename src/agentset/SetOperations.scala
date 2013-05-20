@@ -1,7 +1,6 @@
 package agentset
 
 
-//import org.nlogo.app.App
 import org.nlogo.api._
 
 
@@ -25,13 +24,9 @@ class SetOperations extends DefaultClassManager {
     pm.addPrimitive("sym-difference", SymDifference)
     pm.addPrimitive("groups-of", GroupsOfSizeN)
     pm.addPrimitive("make-n-groups", NGroups)
-    //pm.addPrimitive("group-by", GroupByReporter )
-    //see comments below. threading issues.
+    pm.addPrimitive("group-by", GroupByReporter )
   }
 
-  //def makeAgentSetFrom(k: AgentKind, inp: Set[Agent]): org.nlogo.api.AgentSet = {
-    //  org.nlogo.agent.AgentSet.fromArray(k, inp.toArray(new Agent[] ))   //.toArray(new Agent[inp.size] )
-    //}
 
   def buildAgentSetFrom(k: AgentKind, inp: Set[Agent]): org.nlogo.api.AgentSet = {
     val asBuilder = new org.nlogo.agent.AgentSetBuilder( k, inp.size )
@@ -61,9 +56,9 @@ class SetOperations extends DefaultClassManager {
     def functionToApply: (Set[Agent], Set[Agent]) => Set[Agent]
     override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.AgentsetType), Syntax.AgentsetType )
     override def report(args: Array[Argument], ctxt: Context): AnyRef = {
-        val set1 = args(0).getAgentSet
-        val set2 = args(1).getAgentSet
-        performBinarySetOp(set1, set2, (x: Set[Agent], y: Set[Agent]) => functionToApply(x, y) )
+      val set1 = args(0).getAgentSet
+      val set2 = args(1).getAgentSet
+      performBinarySetOp(set1, set2, (x: Set[Agent], y: Set[Agent]) => functionToApply(x, y) )
     }
   }
 
@@ -84,91 +79,80 @@ class SetOperations extends DefaultClassManager {
   }
 
   object NGroups extends DefaultReporter {
-      override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.NumberType), Syntax.ListType )
+    override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.NumberType), Syntax.ListType )
 
-      override def report(args: Array[Argument], ctxt: Context): AnyRef = {
-        val agset = args(0).getAgentSet
-        val k = agset.kind
-        val numBins = args(1).getIntValue
-        if ( numBins < 1) {
-          throw new ExtensionException("Number of bins must be greater than or equal to one.")
-        }
-
-        import scala.collection.JavaConverters._
-        val agList = agset.agents.asScala.toList
-        val mapOfAgList = agList.zipWithIndex groupBy( x => x._2 % numBins )
-
-        val lbuilder = new LogoListBuilder()
-        mapOfAgList.foreach{ y  =>
-          val z = y._2
-          val w = z.unzip
-          lbuilder add buildAgentSetFrom(k, w._1.toSet)  }
-
-        lbuilder.toLogoList
+    override def report(args: Array[Argument], ctxt: Context): AnyRef = {
+      val agentSet = args(0).getAgentSet
+      val k = agentSet.kind
+      val numBins = args(1).getIntValue
+      if ( numBins < 1) {
+        throw new ExtensionException("Number of bins must be greater than or equal to one.")
       }
+
+      import scala.collection.JavaConverters._
+      val agents = agentSet.agents.asScala.toList
+      val agentMap = agents.zipWithIndex groupBy {case (agent, index) => index % numBins}
+
+      val listBuilder = new LogoListBuilder()
+
+      agentMap.map {
+        case (value, list) => list
+      }.map {
+        case tupleList => tupleList.map{ case (agent,index) => agent }
+      }.foreach ( x => listBuilder add buildAgentSetFrom(k, x.toSet)  )
+
+      listBuilder.toLogoList
+    }
   }
 
   object GroupsOfSizeN extends DefaultReporter {
-      override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.NumberType), Syntax.ListType )
+    override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.NumberType), Syntax.ListType )
 
-      override def report(args: Array[Argument], ctxt: Context): AnyRef = {
-        val agset = args(0).getAgentSet
-        val k = agset.kind
-        val groupSize = args(1).getIntValue
-        if ( groupSize < 1) {
-          throw new ExtensionException("Size of group must be greater than or equal to one.")
-        }
-
-        import scala.collection.JavaConverters._
-        val sa = agset.agents.asScala.toSet
-        val bins = sa.grouped(groupSize)
-        val lbuilder = new LogoListBuilder()
-
-        bins.foreach( x => lbuilder.add( buildAgentSetFrom(k, x)) )
-        lbuilder.toLogoList
+    override def report(args: Array[Argument], ctxt: Context): AnyRef = {
+      val agset = args(0).getAgentSet
+      val k = agset.kind
+      val groupSize = args(1).getIntValue
+      if ( groupSize < 1) {
+        throw new ExtensionException("Size of group must be greater than or equal to one.")
       }
+
+      import scala.collection.JavaConverters._
+      val sa = agset.agents.asScala.toSet
+      val bins = sa.grouped(groupSize)
+      val lbuilder = new LogoListBuilder()
+
+      bins.foreach( x => lbuilder.add( buildAgentSetFrom(k, x)) )
+      lbuilder.toLogoList
+    }
   }
 
 
-  //NOT USED -- need to find out how to deal with the threading issues.
-  /*
   object GroupByReporter extends DefaultReporter {
-      override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.StringType), Syntax.ListType )
+    override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.ReporterTaskType), Syntax.ListType )
 
-      override def report(args: Array[Argument], ctxt: Context): AnyRef = {
-          val agset = args(0).getAgentSet
-          val k = agset.kind
-          val reporterstring = args(1).getString
+    override def report( args:Array[Argument], ctxt: Context): AnyRef = {
 
-          val sa = agset.agents.asScala.toSet
-          val bins = sa.groupBy( x => applyNumericAgentReporter(x.asInstanceOf[org.nlogo.agent.Agent], reporterstring) )
-          val lbuilder = new LogoListBuilder()
+      val agentSet = args(0).getAgentSet
+      val k = agentSet.kind
+      import scala.collection.JavaConverters._
+      val sAgentSet = agentSet.agents.asScala.toSet
 
-          bins.foreach( x  => {
-               val lb2 = new LogoListBuilder()
-               lb2 add Double.box(x._1)
-               lb2 add buildAgentSetFrom(k, x._2)
-               lbuilder.add( lb2.toLogoList )
-             }
-          )
-          lbuilder.toLogoList
+      val task = args(1).getReporterTask
+
+      val valueMap = sAgentSet.map( agent => Array[AnyRef](agent) ).groupBy( singleton => task.report(ctxt, singleton))
+      val flattened = valueMap.mapValues( x => x.flatten )
+      val lbuilder = new LogoListBuilder()
+
+      flattened.foreach{
+        case (value, agentset) =>
+          val innerBuilder = new LogoListBuilder
+          innerBuilder.add( value )
+          innerBuilder.add( buildAgentSetFrom(k, agentset.asInstanceOf[Set[Agent]]) )
+          lbuilder.add( innerBuilder.toLogoList )
       }
-  }
-
-  //problem --> the report call hangs the application.  need a version of report that is like commandLater()
-  def applyNumericAgentReporter( x:org.nlogo.agent.Agent, str:String ): Double = {
-    val aggregated = "[" + str + "] of " + x.toString
-    try {
-      App.app.report( aggregated ).asInstanceOf[Double]
-    }
-   catch {
-     case e:Exception => {
-       println(e.getStackTrace)
-       Double.box(0.0)
-     }
+      lbuilder.toLogoList
     }
   }
-  */
 
 
 }
