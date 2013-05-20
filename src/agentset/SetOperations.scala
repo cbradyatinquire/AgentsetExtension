@@ -98,10 +98,13 @@ class SetOperations extends DefaultClassManager {
 
         import scala.collection.JavaConverters._
         val agList = agset.agents.asScala.toList
-        val mapOfAgList = agList.groupBy( x => agList.indexOf(x) % numBins )
+        val mapOfAgList = agList.zipWithIndex groupBy( x => x._2 % numBins )
 
         val lbuilder = new LogoListBuilder()
-        mapOfAgList.foreach( x  => lbuilder add buildAgentSetFrom(k, x._2.toSet) )
+        mapOfAgList.foreach{ y  =>
+          val z = y._2
+          val w = z.unzip
+          lbuilder add buildAgentSetFrom(k, w._1.toSet)  }
 
         lbuilder.toLogoList
       }
@@ -111,20 +114,20 @@ class SetOperations extends DefaultClassManager {
       override def getSyntax: Syntax = Syntax.reporterSyntax( Array(Syntax.AgentsetType, Syntax.NumberType), Syntax.ListType )
 
       override def report(args: Array[Argument], ctxt: Context): AnyRef = {
-          val agset = args(0).getAgentSet
-          val k = agset.kind
-          val groupSize = args(1).getIntValue
-          if ( groupSize < 1) {
-            throw new ExtensionException("Size of group must be greater than or equal to one.")
-          }
+        val agset = args(0).getAgentSet
+        val k = agset.kind
+        val groupSize = args(1).getIntValue
+        if ( groupSize < 1) {
+          throw new ExtensionException("Size of group must be greater than or equal to one.")
+        }
 
         import scala.collection.JavaConverters._
-          val sa = agset.agents.asScala.toSet
-          val bins = sa.grouped(groupSize)
-          val lbuilder = new LogoListBuilder()
+        val sa = agset.agents.asScala.toSet
+        val bins = sa.grouped(groupSize)
+        val lbuilder = new LogoListBuilder()
 
-          bins.foreach( x => lbuilder.add( buildAgentSetFrom(k, x)) )
-          lbuilder.toLogoList
+        bins.foreach( x => lbuilder.add( buildAgentSetFrom(k, x)) )
+        lbuilder.toLogoList
       }
   }
 
