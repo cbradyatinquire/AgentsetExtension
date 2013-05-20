@@ -1,6 +1,7 @@
-=AGENTSET extension for NetLogo=
+__AGENTSET extension for NetLogo__
+
 Provides set operations for agentsets in NetLogo.
 
-==TODO:==
-group-by primitive<br> 
-testing...
+__TODO:__
+* group-by primitive
+* testing...
