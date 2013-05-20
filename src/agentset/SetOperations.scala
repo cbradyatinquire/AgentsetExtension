@@ -36,9 +36,7 @@ class SetOperations extends DefaultClassManager {
   def buildAgentSetFrom(k: AgentKind, inp: Set[Agent]): org.nlogo.api.AgentSet = {
     val asBuilder = new org.nlogo.agent.AgentSetBuilder( k, inp.size )
     val it = inp.toIterator
-    while ( it.hasNext ) {
-      asBuilder.add( it.next().asInstanceOf[org.nlogo.agent.Agent] )
-    }
+    it.foreach(x => asBuilder.add( x.asInstanceOf[org.nlogo.agent.Agent] ))
     asBuilder.build()
   }
 
